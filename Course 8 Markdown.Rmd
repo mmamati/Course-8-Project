@@ -1,0 +1,73 @@
+---
+title: "Johns Hopkins Data Science Course 8 Project"
+author: "M. Amati"
+date: "April 27, 2018"
+output: html_document
+---
+
+
+
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = FALSE)
+library(caret)
+library(AppliedPredictiveModeling)
+library(ElemStatLearn)
+library(pgmm)
+library(rpart)
+library(dplyr)
+library(scales)
+
+Dir<-"C:/Users/Mike/Documents/Coursera/JohnsHopkinsDataScience/Course_8_Machine_Learning"
+setwd(Dir)
+train_all<-readRDS("train_all.rds")
+train_sig<-readRDS("train_sig.rds")
+test_full<-readRDS("test_full.rds")
+validation_full<-readRDS("validation_full.rds")
+preProcfull <- preProcess(train_all,method="pca",thresh = 0.8)
+trainPCfull <- predict(preProcfull,train_all)
+preProcsig <- preProcess(train_sig,method="pca",thresh = 0.8)
+trainPCsig <- predict(preProcsig,train_sig)
+Training_Accuracy<-readRDS("Training_Accuracy.rds")
+Testing_Accuracy<-readRDS("Testing_Accuracy.rds")
+Validation_Accuracy<-readRDS("Validation_Accuracy.rds")
+```
+
+## Overview
+
+This report serves as a short summary of the process used to build a prediction model against the weight lifiting data available at
+<http://groupware.les.inf.puc-rio.br/har>.  The data was collected from 6 participants, each performing weight lifiting exercises in one of 5 manners, labeled classes A,B,C,D,E. Class A represented correct form while the other classes each represented a specific incorrect forms that the users intentionally used.  The aim of this project is to use the resulting data from from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict which form was used in each iteration of the exercise. 
+
+As shown in the results section the chosen model, a random forest using all of the populated variables, correctly labeled  20 cases reserved by the instructors of the class.
+
+## PreProcessing
+A brief outline of the process used:
+
+1. The labeled data was downloaded and randomly divided into training/test/ and validation sets by a 70/20/10 split.  This resulted in a training set with `r nrow(train_all)`  observations and test and validation sample with `r nrow(test_full)` and `r nrow(validation_full)` samples respectively. 
+
+2. Preprocessing was done to form 3 iterations of the training set:
+    1. **FULL**: Several of the fields had the overwhelming majority of the observations missing or empty.  These were removed to form the FULL set of variables.  This FULL set contained `r ncol(train_all)-1` predictors
+    
+    2. **FULL PCA**:  To reduce the risk of overfitting Principal Components representing 80% of the variance in the FULL set were retained.   This FULL PCA set contained `r ncol(trainPCfull)-1` predictors
+    
+    3. **SIGNIFICANT PCA**:  In an attempt to further reduce the number of predictors to lower the risk of overfitting, the final set used predictors that were shown to have some predictive power on their own.  To determine this each the averages by outcome class of the `r ncol(train_all)-1` predictors in the FULL set was determined.  The classes with the highest and lowest outcome were then compared using a t-test.  If test showed a difference with 99% confidence, the predictor was considered significant and retained in this set.  This resulted in `r ncol(train_sig)-1` predictors, a reduction of only `r ncol(train_all)-1` - `r ncol(train_sig)-1`, suggesting that at least by this measure most variables have some predictive power After reducing to these significant variables, Principal Components representing 80% of the variance among these significant factors were retained, resulting in a SIGNIFICANT training set with `r ncol(trainPCsig)-1` predictors. 
+
+## Modeling
+Four different modeling approaches, random forest (RF), gradient boosting (GBM), linear discrimnant analysis (LDA), and CART,  were used against the 3 versions of the training set described above, for a total of 12 models.  Expectations were that the two boosted models would perform significantly better, but the LDA and CART models were included for comparison.  While high accuracy was expected of the RF and GBM models on the FULL set, I was concerned about overfitting in these cases and expected the FULL PCA or SIGNIFICANT PCA models to perform better on testing. 
+
+As expected, the RF and GBM had very high training accuracies with the other 2 approaches wer quite low.  Random Forest accuracy wsa 100% for all 3 pre-processing options, while gradient boosting accuracy dropped significantly when PCA was applied:
+```{r}
+kable(Training_Accuracy,caption = "Training Accuracy of 4 Model Types against 3 Pre-processing methods")
+```
+
+## Testing and Validation
+All 12 models were applied to the test set.  Concerns on overfitting of the Random Forest models did not appear to bear out:
+```{r}
+kable(Testing_Accuracy,caption = "Testing Accuracy of 4 Model Types against 3 Pre-processing methods")
+```
+
+From the strong test results, the Random Forest Model on the FULL set was chosen and testing against validation.  Validation showed an accuracy of `r percent(Validation_Accuracy)`, leaving me confident it would perform well on the 20 quiz observations.
+
+Indeed, the Random Forest model on the FULL training set correctly classified all 20 quiz problems. 
+
